@@ -163,7 +163,7 @@ async function commitAndPush(message, branch, options = {}) {
   ensureIdentity(cwd, { logger });
 
   // Add all changes in .runner-data
-  add(".runner-data/*", { logger, cwd });
+  add(".runner-data", { logger, cwd });
 
   // Commit
   const committed = commit(message, { logger, cwd });
