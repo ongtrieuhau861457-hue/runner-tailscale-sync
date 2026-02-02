@@ -159,6 +159,9 @@ async function commitAndPush(message, branch, options = {}) {
     return false;
   }
 
+  // Ensure git identity is configured
+  ensureIdentity(cwd, { logger });
+
   // Add all changes in .runner-data
   add(".runner-data/*", { logger, cwd });
 
@@ -170,6 +173,39 @@ async function commitAndPush(message, branch, options = {}) {
   await push(branch, { logger, cwd });
 
   return true;
+}
+
+/**
+ * Ensure git identity is configured
+ */
+function ensureIdentity(cwd, options = {}) {
+  const { logger } = options;
+
+  try {
+    // Check if identity exists
+    const name = process_adapter.runCapture("git config user.name", { cwd });
+    const email = process_adapter.runCapture("git config user.email", { cwd });
+
+    if (!name || !email) {
+      // Set default identity for automation
+      process_adapter.run('git config user.name "Automation Bot"', { cwd });
+      process_adapter.run('git config user.email "bot@automation.local"', { cwd });
+
+      if (logger) {
+        logger.info("Git identity configured for automation");
+      }
+    }
+  } catch (err) {
+    // Set identity if check failed
+    try {
+      process_adapter.run('git config user.name "Automation Bot"', { cwd });
+      process_adapter.run('git config user.email "bot@automation.local"', { cwd });
+    } catch (configErr) {
+      if (logger) {
+        logger.warn("Could not configure git identity");
+      }
+    }
+  }
 }
 
 module.exports = {
