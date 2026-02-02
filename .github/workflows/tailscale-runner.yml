@@ -4,7 +4,8 @@ on:
   push:
 permissions:
   id-token: write # Required for OIDC
-  contents: read
+  contents: write # Thêm dòng này để có quyền push
+
 jobs:
   tailscale-runner:
     runs-on: ubuntu-latest
