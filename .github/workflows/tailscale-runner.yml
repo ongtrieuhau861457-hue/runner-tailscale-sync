@@ -1,4 +1,4 @@
-name: nmp-multi-publish
+name: tailscale-runner
 on:
   workflow_dispatch:
   push:
@@ -6,7 +6,7 @@ permissions:
   id-token: write # Required for OIDC
   contents: read
 jobs:
-  nmp-multi-publish:
+  tailscale-runner:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
