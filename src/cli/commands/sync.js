@@ -4,6 +4,7 @@
  */
 
 const syncOrchestrator = require("../../core/sync-orchestrator");
+const { SyncError } = require("../../utils/errors");
 
 async function run(config, logger) {
   logger.info("Starting full synchronization...");
@@ -14,7 +15,7 @@ async function run(config, logger) {
     logger.success("Synchronization completed successfully!");
     return result;
   } else {
-    throw new Error("Synchronization failed");
+    throw new SyncError("Synchronization failed");
   }
 }
 

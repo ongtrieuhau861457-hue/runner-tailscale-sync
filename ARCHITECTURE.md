@@ -29,6 +29,21 @@ Chứa business logic thuần túy, không phụ thuộc vào infrastructure.
   - Fallback: systemctl → pkill
   - Non-blocking nếu SSH fail
 
+- **init.js**: Khởi tạo runner
+  - Setup .runner-data directories
+  - Connect Tailscale + detect runner trước đó
+  - Pipeline parse → validate → plan → execute → report
+
+- **push.js**: Push dữ liệu lên git
+  - Validate git availability + repo
+  - Commit/push .runner-data
+  - Pipeline parse → validate → plan → execute → report
+
+- **status.js**: Báo trạng thái
+  - Show Tailscale status + peers
+  - Report .runner-data size
+  - Pipeline parse → validate → plan → execute → report
+
 ### 2. Adapter Layer (`src/adapters/`)
 
 Tương tác với external systems và OS.
@@ -57,6 +72,10 @@ Tương tác với external systems và OS.
   - Cross-platform command execution
   - runWithTimeout()
   - commandExists()
+
+- **http.js**: HTTP adapter
+  - fetchWithTimeout()
+  - fetchWithRetry()
 
 ### 3. CLI Layer (`src/cli/`)
 

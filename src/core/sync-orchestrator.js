@@ -10,6 +10,7 @@ const runnerDetector = require("./runner-detector");
 const dataSync = require("./data-sync");
 const serviceController = require("./service-controller");
 const { getTimestamp } = require("../utils/time");
+const { ValidationError, ProcessError } = require("../utils/errors");
 
 /**
  * Parse input
@@ -26,7 +27,9 @@ function parseInput(config, logger) {
  */
 function validate(input) {
   const errors = input.config.validate();
-  return errors;
+  if (errors.length > 0) {
+    throw new ValidationError(`Validation failed:\n  - ${errors.join("\n  - ")}`);
+  }
 }
 
 /**
@@ -168,7 +171,7 @@ async function connectTailscale(config, logger) {
   // Install if needed
   const installed = tailscale.install(logger);
   if (!installed) {
-    throw new Error("Failed to install Tailscale");
+    throw new ProcessError("Failed to install Tailscale");
   }
 
   // Login
@@ -234,10 +237,7 @@ async function orchestrate(config, logger) {
   const input = parseInput(config, logger);
 
   // Step 2: Validate
-  const errors = validate(input);
-  if (errors.length > 0) {
-    throw new Error(`Validation failed:\n  - ${errors.join("\n  - ")}`);
-  }
+  validate(input);
 
   // Step 3: Plan
   const planResult = plan(input);

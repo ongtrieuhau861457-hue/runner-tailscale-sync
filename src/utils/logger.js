@@ -72,8 +72,9 @@ class Logger {
   format(level, msg) {
     const timestamp = getTimestamp();
     const prefix = `[${this.packageName}@${this.version}]`;
+    const commandPrefix = `[${this.command || "unknown"}]`;
     const timePrefix = `[${timestamp}]`;
-    return `${timePrefix} ${prefix} ${level} ${msg}`;
+    return `${timePrefix} ${prefix} ${commandPrefix} ${level} ${msg}`;
   }
 
   /**
@@ -141,6 +142,7 @@ class Logger {
     if (this.quiet) return;
     this.info(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
     this.info(`📦 ${this.packageName} - version ${this.version}`);
+    this.info(`🧾 Đang thực thi version: ${this.version}`);
     if (this.command) {
       this.info(`🎯 Command: ${this.command}`);
     }

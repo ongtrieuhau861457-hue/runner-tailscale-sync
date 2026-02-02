@@ -6,7 +6,7 @@
 const path = require("path");
 const fs_adapter = require("../adapters/fs");
 const process_adapter = require("../adapters/process");
-const { SyncError } = require("../utils/errors");
+const { SyncError, ValidationError } = require("../utils/errors");
 const CONST = require("../utils/constants");
 
 /**
@@ -37,7 +37,9 @@ function validate(input) {
     errors.push("Remote host is required");
   }
 
-  return errors;
+  if (errors.length > 0) {
+    throw new ValidationError(`Validation failed: ${errors.join(", ")}`);
+  }
 }
 
 /**
@@ -153,10 +155,7 @@ async function pullData(config, previousRunner, logger) {
   const input = parseInput(config, previousRunner, logger);
 
   // Step 2: Validate
-  const errors = validate(input);
-  if (errors.length > 0) {
-    throw new Error(`Validation failed: ${errors.join(", ")}`);
-  }
+  validate(input);
 
   // Step 3: Plan
   const planResult = plan(input);
