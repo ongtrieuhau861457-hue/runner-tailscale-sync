@@ -22,9 +22,9 @@ jobs:
       - name: Runner tailscale
         env:
           RUNNER_TAILSCALE_DOTENVRTDB_URL: ${{ secrets.RUNNER_TAILSCALE_DOTENVRTDB_URL }}
-          TAILSCALE_ENABLE: "1"
-          TAILSCALE_CLIENT_SECRET: tskey-client-kNandMDo5H11CNTRL-MqMfzvarm79qMXqKjy9n79HcGVeVVWesg
-          TAILSCALE_CLIENT_ID: kNandMDo5H11CNTRL
-          TAILSCALE_TAGS: tag:ci
+          # TAILSCALE_ENABLE: "1"
+          # TAILSCALE_CLIENT_SECRET: tskey-client-kNandMDo5H11CNTRL-MqMfzvarm79qMXqKjy9n79HcGVeVVWesg
+          # TAILSCALE_CLIENT_ID: kNandMDo5H11CNTRL
+          # TAILSCALE_TAGS: tag:ci
         run: |
           dotenvrtdb -eUrl "$RUNNER_TAILSCALE_DOTENVRTDB_URL" -- node ./bin/runner-sync.js --verbose
