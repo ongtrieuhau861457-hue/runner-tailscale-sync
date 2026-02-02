@@ -47,17 +47,21 @@ class Logger {
         const upperKey = key.toUpperCase();
         return this.sensitivePatterns.some(pattern => upperKey.includes(pattern));
       })
-      .map(([key, value]) => value.trim())
+      .map(([key, value]) => value.trim().replace(/\s+/g, " "))
       .sort((a, b) => b.length - a.length);
 
     const uniqueValues = [...new Set(envValues)];
 
     for (const value of uniqueValues) {
-      if (maskedMsg.includes(value)) {
-        const masked = "*".repeat(value.length);
-        maskedMsg = maskedMsg.split(value).join(masked);
-      }
+      const escapedValue = value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const whitespacePattern = escapedValue.replace(/\s+/g, "\\s+");
+      const regex = new RegExp(whitespacePattern, "g");
+      maskedMsg = maskedMsg.replace(regex, "*".repeat(value.length));
     }
+
+    maskedMsg = maskedMsg.replace(/tskey-[a-zA-Z0-9]{30,}/g, "***TAILSCALE_KEY***");
+    maskedMsg = maskedMsg.replace(/ghp_[a-zA-Z0-9]{36}/g, "***GITHUB_TOKEN***");
+    maskedMsg = maskedMsg.replace(/[A-Za-z0-9+/]{32,}={0,2}/g, "***BASE64_SECRET***");
 
     return maskedMsg;
   }

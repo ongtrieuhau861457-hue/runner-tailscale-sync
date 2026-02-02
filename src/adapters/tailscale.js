@@ -4,6 +4,7 @@
  */
 
 const os = require("os");
+const { spawn } = require("child_process");
 const process_adapter = require("./process");
 const { ProcessError } = require("../utils/errors");
 const CONST = require("../utils/constants");
@@ -111,21 +112,33 @@ async function login(clientId, clientSecret, tags, logger, config) {
   const tagStr = tags ? `--advertise-tags=${tags}` : "";
   
   const sshFlag = (config.isLinux && !config.isWindows) ? "--ssh" : "";
-
-  const cmd = [
-    config.isWindows ? "tailscale" : "sudo tailscale",
+  const baseArgs = [
+    "tailscale",
     "up",
-    `--client-id=${clientId}`,
-    `--client-secret=${clientSecret}`,
+    "--auth-stdin",
     "--accept-routes",
     "--accept-dns=true",
     sshFlag,
     tagStr,
-  ]
-    .filter(Boolean)
-    .join(" ");
+  ].filter(Boolean);
 
-  process_adapter.run(cmd, { logger, ignoreError: false });
+  const cmd = config.isWindows ? baseArgs : ["sudo", ...baseArgs];
+
+  await new Promise((resolve, reject) => {
+    const child = spawn(cmd[0], cmd.slice(1), { stdio: ["pipe", "inherit", "inherit"] });
+
+    child.on("error", (err) => reject(err));
+    child.on("close", (code) => {
+      if (code === 0) {
+        resolve(true);
+      } else {
+        reject(new ProcessError(`tailscale up failed with code ${code}`));
+      }
+    });
+
+    child.stdin.write(`${clientId}\n${clientSecret}\n`);
+    child.stdin.end();
+  });
 
   logger.info("Waiting for Tailscale connection...");
   const connected = await process_adapter.waitForCondition(

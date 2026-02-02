@@ -66,10 +66,13 @@ async function execute(planResult, input) {
 
   // Build rsync command
   // rsync -avz -e ssh remote:.runner-data/ local/.runner-data/
+  const isLocalNetwork = input.remoteHost?.startsWith("100.");
   const rsyncCmd = [
     planResult.rsyncPath,
-    "-avz",
+    isLocalNetwork ? "-av" : "-avz",
     "--delete",
+    "--partial",
+    "--progress",
     "-e",
     `${planResult.sshPath} -o StrictHostKeyChecking=no`,
     planResult.source,

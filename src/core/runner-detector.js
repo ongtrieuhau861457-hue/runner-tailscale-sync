@@ -4,6 +4,7 @@
  */
 
 const tailscale = require("../adapters/tailscale");
+const ssh = require("../adapters/ssh");
 
 /**
  * Parse input
@@ -11,6 +12,7 @@ const tailscale = require("../adapters/tailscale");
 function parseInput(config, logger) {
   return {
     tags: String(config.tailscaleTags || "").split(",").map(s=>s.trim()).filter(Boolean),
+    sshPath: config.sshPath,
     logger,
   };
 }
@@ -21,7 +23,7 @@ function parseInput(config, logger) {
 function validate(input) {
   const errors = [];
 
-  if (!input.tag) {
+  if (!input.tags || input.tags.length === 0) {
     errors.push("Tailscale tag is required");
   }
 
@@ -41,7 +43,7 @@ function plan(input) {
 /**
  * Execute - tìm runner trước đó
  */
-function execute(planResult, input) {
+async function execute(planResult, input) {
   const { logger } = input;
 
   logger.info("Searching for previous runner on Tailscale network...");
@@ -57,16 +59,49 @@ function execute(planResult, input) {
     };
   }
 
-  // Pick best candidate:
-  // - Prefer most recently seen (if available)
-  // - Otherwise use the first one returned
-  const peer = peers
+  for (const peer of peers) {
+    const targetHost = peer.ips?.[0];
+    if (!targetHost) {
+      peer.accessible = false;
+      continue;
+    }
+    peer.accessible = await Promise.resolve(
+      ssh.checkConnection(targetHost, { logger, sshPath: input.sshPath })
+    );
+  }
+
+  const accessiblePeers = peers.filter((peer) => peer.accessible);
+
+  for (const peer of accessiblePeers) {
+    const targetHost = peer.ips?.[0];
+    if (!targetHost) {
+      peer.hasData = false;
+      continue;
+    }
+    const result = ssh.executeCommandCapture(
+      targetHost,
+      'test -d .runner-data && echo "yes"',
+      { sshPath: input.sshPath }
+    );
+    peer.hasData = result === "yes";
+  }
+
+  const peer = accessiblePeers
+    .filter((item) => item.hasData)
     .slice()
     .sort((a, b) => {
       const ta = a.lastSeen ? Date.parse(a.lastSeen) : 0;
       const tb = b.lastSeen ? Date.parse(b.lastSeen) : 0;
       return tb - ta;
     })[0];
+
+  if (!peer) {
+    logger.info("No accessible runner with data found");
+    return {
+      found: false,
+      peer: null,
+    };
+  }
 
   logger.success(`Found previous runner: ${peer.hostname || peer.id}`);
   logger.info(`  IP: ${peer.ips[0] || "N/A"}`);
@@ -116,7 +151,7 @@ async function detectPreviousRunner(config, logger) {
   const planResult = plan(input);
 
   // Step 4: Execute
-  const execResult = execute(planResult, input);
+  const execResult = await execute(planResult, input);
 
   // Step 5: Report
   return report(execResult, input);

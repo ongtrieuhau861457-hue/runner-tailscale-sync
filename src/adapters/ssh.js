@@ -80,27 +80,27 @@ async function stopServices(host, services, options = {}) {
 
   logger.info(`Stopping services on ${host}: ${services.join(", ")}`);
 
-  for (const service of services) {
-    try {
-      // Try systemctl first
-      await executeCommand(host, `sudo systemctl stop ${service}`, { 
-        logger, 
-        sshPath 
-      });
-      logger.success(`Stopped service: ${service}`);
-    } catch (err) {
-      // Try pkill as fallback
+  await Promise.all(
+    services.map(async (service) => {
       try {
-        await executeCommand(host, `pkill -f ${service}`, { 
-          logger, 
-          sshPath 
+        await executeCommand(host, `sudo systemctl stop ${service}`, {
+          logger,
+          sshPath,
         });
-        logger.success(`Killed process: ${service}`);
-      } catch (err2) {
-        logger.warn(`Failed to stop ${service}: ${err2.message}`);
+        logger.success(`Stopped service: ${service}`);
+      } catch (err) {
+        try {
+          await executeCommand(host, `pkill -f ${service}`, {
+            logger,
+            sshPath,
+          });
+          logger.success(`Killed process: ${service}`);
+        } catch (err2) {
+          logger.warn(`Failed to stop ${service}: ${err2.message}`);
+        }
       }
-    }
-  }
+    })
+  );
 }
 
 module.exports = {

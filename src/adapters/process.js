@@ -73,19 +73,33 @@ function runWithTimeout(cmd, timeoutMs, options = {}) {
   const useArray = Array.isArray(cmd);
 
   return new Promise((resolve, reject) => {
+    const spawnOptions = {
+      stdio: "inherit",
+      cwd: options.cwd || process.cwd(),
+      detached: !isWindows,
+    };
     const child = useArray
-      ? spawn(cmd[0], cmd.slice(1), {
-          stdio: "inherit",
-          cwd: options.cwd || process.cwd(),
-        })
-      : spawn(cmd, {
-          stdio: "inherit",
-          cwd: options.cwd || process.cwd(),
-          shell: true,
-        });
+      ? spawn(cmd[0], cmd.slice(1), spawnOptions)
+      : spawn(cmd, { ...spawnOptions, shell: true });
 
     const timer = setTimeout(() => {
-      child.kill();
+      if (isWindows) {
+        try {
+          execSync(`taskkill /pid ${child.pid} /T /F`);
+        } catch (err) {
+          if (logger) {
+            logger.warn(`Failed to terminate process tree: ${err.message}`);
+          }
+        }
+      } else {
+        try {
+          process.kill(-child.pid, "SIGKILL");
+        } catch (err) {
+          if (logger) {
+            logger.warn(`Failed to terminate process group: ${err.message}`);
+          }
+        }
+      }
       reject(new Error(`Command timeout after ${timeoutMs}ms: ${useArray ? cmd.join(" ") : cmd}`));
     }, timeoutMs);
 
