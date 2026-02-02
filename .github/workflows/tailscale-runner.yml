@@ -18,7 +18,7 @@ jobs:
           npm i
           npm i -g @tltdh61/dotenvrtdb
           npm i -g @o861runners/nmp
-          npm i @ongtrieuhau861457/runner-tailscale-sync
+          npm i -g @ongtrieuhau861457/runner-tailscale-sync
       - name: Runner tailscale
         env:
           RUNNER_TAILSCALE_DOTENVRTDB_URL: ${{ secrets.RUNNER_TAILSCALE_DOTENVRTDB_URL }}

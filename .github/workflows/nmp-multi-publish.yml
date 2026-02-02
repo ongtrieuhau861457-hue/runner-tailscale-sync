@@ -2,6 +2,11 @@ name: nmp-multi-publish
 on:
   workflow_dispatch:
   push:
+    paths:
+      - "bin/**"
+      - "src/**"
+      - "README.md"
+      - "package.json"
 permissions:
   id-token: write # Required for OIDC
   contents: read
