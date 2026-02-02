@@ -5,6 +5,7 @@
 
 const tailscale = require("../adapters/tailscale");
 const ssh = require("../adapters/ssh");
+const { ValidationError } = require("../utils/errors");
 
 /**
  * Parse input
@@ -27,7 +28,9 @@ function validate(input) {
     errors.push("Tailscale tag is required");
   }
 
-  return errors;
+  if (errors.length > 0) {
+    throw new ValidationError(`Validation failed: ${errors.join(", ")}`);
+  }
 }
 
 /**
@@ -142,10 +145,7 @@ async function detectPreviousRunner(config, logger) {
   const input = parseInput(config, logger);
 
   // Step 2: Validate
-  const errors = validate(input);
-  if (errors.length > 0) {
-    throw new Error(`Validation failed: ${errors.join(", ")}`);
-  }
+  validate(input);
 
   // Step 3: Plan
   const planResult = plan(input);

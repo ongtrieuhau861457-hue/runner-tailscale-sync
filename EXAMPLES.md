@@ -26,14 +26,15 @@ runner-sync
 
 Output:
 ```
-[250202-153045] [runner-tailscale-sync@1.250202.11530] ℹ️ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-[250202-153045] [runner-tailscale-sync@1.250202.11530] ℹ️ 📦 runner-tailscale-sync - version 1.250202.11530
-[250202-153045] [runner-tailscale-sync@1.250202.11530] ℹ️ 🎯 Command: sync
-[250202-153045] [runner-tailscale-sync@1.250202.11530] ℹ️ 🕐 Started at: 250202-153045 (VN Time)
-[250202-153045] [runner-tailscale-sync@1.250202.11530] ℹ️ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-[250202-153046] [runner-tailscale-sync@1.250202.11530] ℹ️ Starting full synchronization...
-[250202-153046] [runner-tailscale-sync@1.250202.11530] ℹ️ ━━━ Step: setup_directories ━━━
-[250202-153046] [runner-tailscale-sync@1.250202.11530] ✅ Created 5 directories
+[250202-153045] [runner-tailscale-sync@1.250202.11530] [sync] ℹ️ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+[250202-153045] [runner-tailscale-sync@1.250202.11530] [sync] ℹ️ 📦 runner-tailscale-sync - version 1.250202.11530
+[250202-153045] [runner-tailscale-sync@1.250202.11530] [sync] ℹ️ 🧾 Đang thực thi version: 1.250202.11530
+[250202-153045] [runner-tailscale-sync@1.250202.11530] [sync] ℹ️ 🎯 Command: sync
+[250202-153045] [runner-tailscale-sync@1.250202.11530] [sync] ℹ️ 🕐 Started at: 250202-153045 (VN Time)
+[250202-153045] [runner-tailscale-sync@1.250202.11530] [sync] ℹ️ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+[250202-153046] [runner-tailscale-sync@1.250202.11530] [sync] ℹ️ Starting full synchronization...
+[250202-153046] [runner-tailscale-sync@1.250202.11530] [sync] ℹ️ ━━━ Step: setup_directories ━━━
+[250202-153046] [runner-tailscale-sync@1.250202.11530] [sync] ✅ Created 5 directories
 ...
 ```
 
@@ -57,19 +58,17 @@ runner-sync status
 
 Output:
 ```
-━━━ Tailscale Status ━━━
-Backend: Running
-Hostname: runner-01
-DNS: runner-01.tail-scale.ts.net
-IPs: 100.64.0.1
-Peers: 1 connected
-
-Peers with tag 'tag:ci':
-  1. runner-02 (100.64.0.2)
-
-━━━ Runner Data ━━━
-Directory: /home/runner/work/project/.runner-data
-Size: 45.23 MB
+[250202-153045] [runner-tailscale-sync@1.250202.11530] [status] ℹ️ ━━━ Tailscale Status ━━━
+[250202-153045] [runner-tailscale-sync@1.250202.11530] [status] ℹ️ Backend: Running
+[250202-153045] [runner-tailscale-sync@1.250202.11530] [status] ℹ️ Hostname: runner-01
+[250202-153045] [runner-tailscale-sync@1.250202.11530] [status] ℹ️ DNS: runner-01.tail-scale.ts.net
+[250202-153045] [runner-tailscale-sync@1.250202.11530] [status] ℹ️ IPs: 100.64.0.1
+[250202-153045] [runner-tailscale-sync@1.250202.11530] [status] ℹ️ Peers: 1 connected
+[250202-153045] [runner-tailscale-sync@1.250202.11530] [status] ℹ️ Peers with tag 'tag:ci':
+[250202-153045] [runner-tailscale-sync@1.250202.11530] [status] ℹ️   1. runner-02 (100.64.0.2)
+[250202-153046] [runner-tailscale-sync@1.250202.11530] [status] ℹ️ ━━━ Runner Data ━━━
+[250202-153046] [runner-tailscale-sync@1.250202.11530] [status] ℹ️ Directory: /home/runner/work/project/.runner-data
+[250202-153046] [runner-tailscale-sync@1.250202.11530] [status] ℹ️ Size: 45.23 MB
 ```
 
 ### 5. Custom working directory

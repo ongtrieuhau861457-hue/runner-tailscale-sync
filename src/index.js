@@ -9,6 +9,9 @@ const syncOrchestrator = require("./core/sync-orchestrator");
 const runnerDetector = require("./core/runner-detector");
 const dataSync = require("./core/data-sync");
 const serviceController = require("./core/service-controller");
+const initRunner = require("./core/init");
+const pushRunner = require("./core/push");
+const statusRunner = require("./core/status");
 
 // Adapters
 const tailscale = require("./adapters/tailscale");
@@ -16,6 +19,7 @@ const git = require("./adapters/git");
 const ssh = require("./adapters/ssh");
 const fs_adapter = require("./adapters/fs");
 const process_adapter = require("./adapters/process");
+const http_adapter = require("./adapters/http");
 
 // Utils
 const time = require("./utils/time");
@@ -57,8 +61,9 @@ async function init(options = {}) {
     quiet: options.quiet || false,
   });
 
-  const initCmd = require("./cli/commands/init");
-  return await initCmd.run(config, logger);
+  logger.printBanner();
+
+  return await initRunner.initRunner(config, logger);
 }
 
 /**
@@ -76,8 +81,9 @@ async function push(options = {}) {
     quiet: options.quiet || false,
   });
 
-  const pushCmd = require("./cli/commands/push");
-  return await pushCmd.run(config, logger);
+  logger.printBanner();
+
+  return await pushRunner.pushRunnerData(config, logger);
 }
 
 /**
@@ -95,8 +101,9 @@ async function status(options = {}) {
     quiet: options.quiet || false,
   });
 
-  const statusCmd = require("./cli/commands/status");
-  return await statusCmd.run(config, logger);
+  logger.printBanner();
+
+  return await statusRunner.showStatus(config, logger);
 }
 
 // Export API và modules
@@ -112,6 +119,9 @@ module.exports = {
   runnerDetector,
   dataSync,
   serviceController,
+  initRunner,
+  pushRunner,
+  statusRunner,
 
   // Adapters
   tailscale,
@@ -119,6 +129,7 @@ module.exports = {
   ssh,
   fs: fs_adapter,
   process: process_adapter,
+  http: http_adapter,
 
   // Utils
   Config,
