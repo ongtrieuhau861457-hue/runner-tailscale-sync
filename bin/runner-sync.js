@@ -1,17 +1,17 @@
 #!/usr/bin/env node
 /**
  * bin/runner-sync.js
- * CLI entry point
+ * CLI entry point - Always run full workflow
  */
 
-const path = require("path");
 const Config = require("../src/utils/config");
 const Logger = require("../src/utils/logger");
 const { parseArgs, printHelp } = require("../src/cli/parser");
+const syncOrchestrator = require("../src/core/sync-orchestrator");
 const pkg = require("../package.json");
 
 // Parse arguments
-const { command, options } = parseArgs(process.argv);
+const { options } = parseArgs(process.argv);
 
 // Handle help
 if (options.help) {
@@ -20,19 +20,17 @@ if (options.help) {
 }
 
 // Handle version
-if (command === "version") {
+if (options.version) {
   console.log(`${pkg.name} v${pkg.version}`);
   process.exit(0);
 }
 
-// Create config
+// Create config & logger
 const config = new Config(options);
-
-// Create logger
 const logger = new Logger({
   packageName: pkg.name,
   version: pkg.version,
-  command,
+  command: "sync",
   verbose: options.verbose,
   quiet: options.quiet,
 });
@@ -40,46 +38,16 @@ const logger = new Logger({
 // Print banner
 logger.printBanner();
 
-// Run command
+// Run full workflow
 (async () => {
   try {
-    let commandModule;
-
-    switch (command) {
-      case "init":
-        commandModule = require("../src/cli/commands/init");
-        break;
-      case "sync":
-        commandModule = require("../src/cli/commands/sync");
-        break;
-      case "push":
-        commandModule = require("../src/cli/commands/push");
-        break;
-      case "status":
-        commandModule = require("../src/cli/commands/status");
-        break;
-      default:
-        logger.error(`Unknown command: ${command}`);
-        printHelp();
-        process.exit(1);
-    }
-
-    const result = await commandModule.run(config, logger);
-
-    if (result.success) {
-      process.exit(0);
-    } else {
-      process.exit(1);
-    }
+    const result = await syncOrchestrator.orchestrate(config, logger);
+    process.exit(result.success ? 0 : 1);
   } catch (err) {
     logger.error(err.message);
-
     if (options.verbose && err.stack) {
       logger.debug(err.stack);
     }
-
-    // Exit with appropriate code
-    const exitCode = err.exitCode || 1;
-    process.exit(exitCode);
+    process.exit(err.exitCode || 1);
   }
 })();

@@ -50,9 +50,6 @@ function plan(input) {
   };
 }
 
-/**
- * Execute - chạy từng bước
- */
 async function execute(planResult, input) {
   const { config, logger } = input;
   const results = {};
@@ -77,25 +74,45 @@ async function execute(planResult, input) {
 
         case "detect_previous_runner":
           results.detection = await runnerDetector.detectPreviousRunner(config, logger);
+
+          // Set flag for later steps
+          const hasPreviousRunner = results.detection?.previousRunner != null;
+
+          if (!hasPreviousRunner) {
+            logger.info("No previous runner detected - skipping pull/stop/push");
+          }
           break;
 
         case "pull_data":
-          results.pullData = await dataSync.pullData(
-            config,
-            results.detection?.previousRunner,
-            logger
-          );
+          // Check if we have previous runner
+          if (!results.detection?.previousRunner) {
+            logger.info("Skipping pull - no previous runner");
+            results.pullData = { success: true, skipped: true };
+            break;
+          }
+
+          results.pullData = await dataSync.pullData(config, results.detection.previousRunner, logger);
           break;
 
         case "stop_remote_services":
-          results.stopServices = await serviceController.stopRemoteServices(
-            config,
-            results.detection?.previousRunner,
-            logger
-          );
+          // Check if we have previous runner
+          if (!results.detection?.previousRunner) {
+            logger.info("Skipping service stop - no previous runner");
+            results.stopServices = { success: true, skipped: true };
+            break;
+          }
+
+          results.stopServices = await serviceController.stopRemoteServices(config, results.detection.previousRunner, logger);
           break;
 
         case "push_to_git":
+          // Check if we have previous runner
+          if (!results.detection?.previousRunner) {
+            logger.info("Skipping git push - no previous runner");
+            results.pushGit = { success: true, skipped: true };
+            break;
+          }
+
           results.pushGit = await pushToGit(config, logger);
           break;
 
@@ -150,7 +167,7 @@ function report(results, input) {
  */
 async function setupDirectories(config, logger) {
   logger.info("Setting up directories...");
-  
+
   const dirs = config.getDirectoriesToEnsure();
   fs_adapter.ensureDirs(dirs);
 
@@ -175,13 +192,7 @@ async function connectTailscale(config, logger) {
   }
 
   // Login
-  await tailscale.login(
-    config.tailscaleClientId,
-    config.tailscaleClientSecret,
-    config.tailscaleTags,
-    logger,
-    config
-  );
+  await tailscale.login(config.tailscaleClientId, config.tailscaleClientSecret, config.tailscaleTags, logger, config);
 
   // Get connection info
   const ip = tailscale.getIP(logger);
@@ -241,7 +252,7 @@ async function orchestrate(config, logger) {
 
   // Step 3: Plan
   const planResult = plan(input);
-  logger.debug(`Planned ${planResult.steps.filter(s => s.enabled).length} steps`);
+  logger.debug(`Planned ${planResult.steps.filter((s) => s.enabled).length} steps`);
 
   // Step 4: Execute
   const execResult = await execute(planResult, input);

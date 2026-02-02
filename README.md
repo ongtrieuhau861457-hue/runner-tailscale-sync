@@ -26,61 +26,55 @@ npm install -g runner-tailscale-sync
 ### CLI
 
 ```bash
-# Full sync workflow
+# Run full workflow (init → detect → pull → stop → push)
 TAILSCALE_ENABLE=1 runner-sync
-
-# Chỉ khởi tạo Tailscale
-runner-sync init
-
-# Chỉ push git
-runner-sync push
-
-# Xem status
-runner-sync status
 
 # Custom working directory
 runner-sync --cwd /path/to/project
 
 # Verbose mode
-runner-sync -v
+runner-sync --verbose
+
+# Quiet mode
+runner-sync --quiet
 ```
+
+**Workflow tự động**:
+
+1. **Init**: Cài đặt Tailscale và kết nối mạng
+2. **Detect**: Tìm runner trước đó (cùng tag)
+3. **Pull**: Đồng bộ `.runner-data` từ runner cũ (nếu có)
+4. **Stop**: Dừng services trên runner cũ (nếu có)
+5. **Push**: Đẩy `.runner-data` lên git (nếu có runner cũ)
 
 ### Library
 
 ```javascript
-const runnerSync = require('runner-tailscale-sync');
+const runnerSync = require("runner-tailscale-sync");
 
-// Full sync
+// Run full workflow
 await runnerSync.sync({
-  cwd: '/path/to/project',
+  cwd: "/path/to/project",
   verbose: true,
 });
 
-// Chỉ init
-await runnerSync.init();
+// Access individual modules (advanced)
+const { Config, Logger, syncOrchestrator } = require("runner-tailscale-sync");
 
-// Chỉ push git
-await runnerSync.push();
+const config = new Config({ cwd: process.cwd() });
+const logger = new Logger({ packageName: "my-tool", version: "1.0.0" });
 
-// Xem status
-await runnerSync.status();
+await syncOrchestrator.orchestrate(config, logger);
 ```
 
 ### Advanced Usage - Sử dụng modules riêng lẻ
 
 ```javascript
-const { 
-  Config, 
-  Logger, 
-  syncOrchestrator,
-  runnerDetector,
-  dataSync,
-  tailscale 
-} = require('runner-tailscale-sync');
+const { Config, Logger, syncOrchestrator, runnerDetector, dataSync, tailscale } = require("runner-tailscale-sync");
 
 // Tạo config
 const config = new Config({ cwd: process.cwd() });
-const logger = new Logger({ packageName: 'my-tool', version: '1.0.0' });
+const logger = new Logger({ packageName: "my-tool", version: "1.0.0" });
 
 // Detect previous runner
 const detection = await runnerDetector.detectPreviousRunner(config, logger);
@@ -177,7 +171,7 @@ Tất cả dữ liệu được lưu trong `.runner-data/`:
     TAILSCALE_CLIENT_ID: $(TAILSCALE_CLIENT_ID)
     TAILSCALE_CLIENT_SECRET: $(TAILSCALE_CLIENT_SECRET)
     TAILSCALE_ENABLE: 1
-  displayName: 'Sync Runner Data'
+  displayName: "Sync Runner Data"
 ```
 
 ### Self-hosted Runner
@@ -231,6 +225,7 @@ node -e "require('./src/index.js').status().then(console.log)"
 Version theo giờ Việt Nam (UTC+7): `1.yyMMdd.1HHmm`
 
 Ví dụ:
+
 - Build lúc 15:30 ngày 02/02/2025 → `1.250202.11530`
 - Build lúc 09:45 ngày 15/03/2025 → `1.250315.10945`
 
@@ -246,11 +241,13 @@ Ví dụ:
 ### Windows
 
 Trên Windows, cần cài thêm:
+
 - [Tailscale for Windows](https://tailscale.com/download/windows)
 - Git for Windows (có sẵn ssh/scp)
 - Hoặc cài rsync qua: `choco install rsync` hoặc WSL
 
 Cấu hình đường dẫn trong `.env`:
+
 ```env
 SSH_PATH=C:\Program Files\Git\usr\bin\ssh.exe
 RSYNC_PATH=C:\Program Files\rsync\rsync.exe

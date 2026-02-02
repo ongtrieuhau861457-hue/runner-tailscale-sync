@@ -110,9 +110,6 @@ async function status(options = {}) {
 module.exports = {
   // Main API
   sync,
-  init,
-  push,
-  status,
 
   // Core modules
   syncOrchestrator,
