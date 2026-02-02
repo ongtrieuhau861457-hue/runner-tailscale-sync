@@ -23,4 +23,4 @@ jobs:
         env:
           RUNNER_TAILSCALE_DOTENVRTDB_URL: ${{ secrets.RUNNER_TAILSCALE_DOTENVRTDB_URL }}
         run: |
-          dotenvrtdb -eUrl "$RUNNER_TAILSCALE_DOTENVRTDB_URL" -- runner-sync -v
+          dotenvrtdb -eUrl "$RUNNER_TAILSCALE_DOTENVRTDB_URL" -- runner-sync --verbose
