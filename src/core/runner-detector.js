@@ -12,7 +12,10 @@ const { ValidationError } = require("../utils/errors");
  */
 function parseInput(config, logger) {
   return {
-    tags: String(config.tailscaleTags || "").split(",").map(s=>s.trim()).filter(Boolean),
+    tags: String(config.tailscaleTags || "")
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean),
     sshPath: config.sshPath,
     logger,
   };
@@ -68,9 +71,7 @@ async function execute(planResult, input) {
       peer.accessible = false;
       continue;
     }
-    peer.accessible = await Promise.resolve(
-      ssh.checkConnection(targetHost, { logger, sshPath: input.sshPath })
-    );
+    peer.accessible = await Promise.resolve(ssh.checkConnection(targetHost, { logger, sshPath: input.sshPath }));
   }
 
   const accessiblePeers = peers.filter((peer) => peer.accessible);
@@ -81,10 +82,13 @@ async function execute(planResult, input) {
       peer.hasData = false;
       continue;
     }
+
+    // Tìm .runner-data trong thư mục work của GitHub Actions
+    // Sử dụng find để tìm kiếm linh hoạt trong ~/work
     const result = ssh.executeCommandCapture(
       targetHost,
-      'test -d .runner-data && echo "yes"',
-      { sshPath: input.sshPath }
+      'find ~/work -type d -name ".runner-data" -print -quit 2>/dev/null | grep -q ".runner-data" && echo "yes"',
+      { sshPath: input.sshPath },
     );
     peer.hasData = result === "yes";
   }
