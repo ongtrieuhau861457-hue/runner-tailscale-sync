@@ -164,7 +164,7 @@ async function commitAndPush(message, branch, options = {}) {
 
   // Add all changes in .runner-data
   // Tạo file .gitkeep trong thư mục .runner-data
-  fs.writeFileSync(".runner-data/.gitkeep", new Date().toISOString());
+  require("fs").writeFileSync(".runner-data/.gitkeep", new Date().toISOString());
   add(".runner-data", { logger, cwd });
 
   // Commit
