@@ -10,12 +10,35 @@ const { SyncError, ValidationError } = require("../utils/errors");
 const CONST = require("../utils/constants");
 
 /**
+ * Resolve host to include user if not present
+ * @param {string} host - hostname or IP, optionally with user (user@host)
+ * @returns {string} - host with user prefix (root@host if no user specified)
+ */
+function resolveHost(host) {
+  if (!host) {
+    return host;
+  }
+
+  // Nếu đã có @ (đã có user) thì giữ nguyên
+  if (host.includes("@")) {
+    return host;
+  }
+
+  // Nếu chưa có @ thì thêm root@
+  return `root@${host}`;
+}
+
+/**
  * Parse input
  */
 function parseInput(config, previousRunner, logger) {
+  const remoteHostRaw = previousRunner?.dnsName || previousRunner?.ips?.[0];
+  const remoteHost = resolveHost(remoteHostRaw);
+
   return {
     localDataDir: config.runnerDataDir,
-    remoteHost: previousRunner?.dnsName || previousRunner?.ips?.[0],
+    remoteHost: remoteHost,
+    remoteHostRaw: remoteHostRaw, // Lưu lại để check isLocalNetwork
     remoteDataDir: config.runnerDataDir,
     rsyncPath: config.rsyncPath,
     sshPath: config.sshPath,
@@ -50,6 +73,8 @@ function plan(input) {
     action: "rsync_pull",
     source: `${input.remoteHost}:${input.remoteDataDir}/`,
     destination: input.localDataDir,
+    remoteHost: input.remoteHost,
+    remoteHostRaw: input.remoteHostRaw,
     rsyncPath: input.rsyncPath,
     sshPath: input.sshPath,
   };
@@ -67,8 +92,8 @@ async function execute(planResult, input) {
   fs_adapter.ensureDir(planResult.destination);
 
   // Build rsync command
-  // rsync -avz -e ssh remote:.runner-data/ local/.runner-data/
-  const isLocalNetwork = input.remoteHost?.startsWith("100.");
+  // rsync -avz -e "ssh -o StrictHostKeyChecking=no" root@remote:.runner-data/ local/.runner-data/
+  const isLocalNetwork = planResult.remoteHostRaw?.startsWith("100.");
   const rsyncCmd = [
     planResult.rsyncPath,
     isLocalNetwork ? "-av" : "-avz",
@@ -76,17 +101,13 @@ async function execute(planResult, input) {
     "--partial",
     "--progress",
     "-e",
-    `${planResult.sshPath} -o StrictHostKeyChecking=no`,
+    `${planResult.sshPath} -o StrictHostKeyChecking=no -o LogLevel=ERROR`,
     planResult.source,
     planResult.destination,
   ];
 
   try {
-    await process_adapter.runWithTimeout(
-      rsyncCmd,
-      CONST.RSYNC_TIMEOUT,
-      { logger }
-    );
+    await process_adapter.runWithTimeout(rsyncCmd, CONST.RSYNC_TIMEOUT, { logger });
 
     logger.success("Data synced successfully");
 
@@ -103,12 +124,19 @@ async function execute(planResult, input) {
     logger.warn("Rsync failed, trying scp as fallback...");
 
     try {
-      const scpCmd = `${planResult.sshPath} -r ${planResult.source} ${planResult.destination}`;
-      await process_adapter.runWithTimeout(
-        scpCmd,
-        CONST.RSYNC_TIMEOUT,
-        { logger }
-      );
+      // scp -r -o StrictHostKeyChecking=no root@remote:.runner-data/* local/.runner-data/
+      const scpCmd = [
+        planResult.sshPath.replace("ssh", "scp"), // Thay ssh bằng scp
+        "-r",
+        "-o",
+        "StrictHostKeyChecking=no",
+        "-o",
+        "LogLevel=ERROR",
+        `${planResult.remoteHost}:${planResult.source.replace(/\/$/, "")}/*`, // Remove trailing slash
+        planResult.destination,
+      ];
+
+      await process_adapter.runWithTimeout(scpCmd, CONST.RSYNC_TIMEOUT, { logger });
 
       logger.success("Data synced via scp");
       const size = fs_adapter.getDirSize(planResult.destination);
@@ -174,4 +202,5 @@ module.exports = {
   plan,
   execute,
   report,
+  resolveHost,
 };
