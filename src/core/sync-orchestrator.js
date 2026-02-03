@@ -173,10 +173,119 @@ async function setupDirectories(config, logger) {
 
   logger.success(`Created ${dirs.length} directories`);
 
+  // Gọi hàm ghi metadata.json
+  const metadataResult = await setupMetaJson(config, logger);
+  
+  if (!metadataResult.success) {
+    logger.warn("Failed to write metadata file");
+  }
+
   return {
     success: true,
     directories: dirs,
+    metadata: metadataResult,
   };
+}
+
+/**
+ * Setup metadata.json
+ * Ghi thông tin runner vào file metadata để remote machine có thể đọc
+ */
+async function setupMetaJson(config, logger) {
+  const METADATA_FILE = "/var/tmp/runner-tailscale-sync-metadata.json";
+  
+  logger.info("Writing runner metadata...");
+
+  try {
+    const process_adapter = require("../adapters/process");
+    const path = require("path");
+
+    // Get current user
+    const userResult = await process_adapter.runWithTimeout(
+      ["whoami"],
+      5000,
+      { logger, silent: true }
+    );
+    const user = userResult.stdout?.trim() || "unknown";
+
+    // Get current working directory
+    const cwd = process.cwd();
+    const runnerDataDir = path.join(cwd, ".runner-data");
+
+    // Get HOME directory
+    const homeDir = process.env.HOME || `/home/${user}`;
+    const workDir = path.join(homeDir, "work");
+
+    // Get timestamp
+    const timestamp = new Date().toISOString();
+
+    // Prepare metadata object
+    const metadata = {
+      timestamp: timestamp,
+      runner: {
+        user: user,
+        runnerDataDir: runnerDataDir,
+        workDir: workDir,
+        cwd: cwd,
+        platform: process.platform,
+        hostname: require("os").hostname(),
+      },
+      env: {
+        // Các biến môi trường quan trọng
+        HOME: process.env.HOME,
+        USER: process.env.USER,
+        PATH: process.env.PATH,
+        SHELL: process.env.SHELL,
+        
+        // Azure Pipelines specific
+        AGENT_NAME: process.env.AGENT_NAME,
+        AGENT_ID: process.env.AGENT_ID,
+        AGENT_WORKFOLDER: process.env.AGENT_WORKFOLDER,
+        BUILD_BUILDID: process.env.BUILD_BUILDID,
+        SYSTEM_TEAMPROJECT: process.env.SYSTEM_TEAMPROJECT,
+        
+        // GitHub Actions specific
+        GITHUB_ACTIONS: process.env.GITHUB_ACTIONS,
+        GITHUB_WORKFLOW: process.env.GITHUB_WORKFLOW,
+        GITHUB_RUN_ID: process.env.GITHUB_RUN_ID,
+        GITHUB_REPOSITORY: process.env.GITHUB_REPOSITORY,
+        RUNNER_NAME: process.env.RUNNER_NAME,
+        RUNNER_WORKSPACE: process.env.RUNNER_WORKSPACE,
+        
+        // Tailscale specific (nếu có)
+        TAILSCALE_IP: process.env.TAILSCALE_IP,
+        TAILSCALE_HOSTNAME: process.env.TAILSCALE_HOSTNAME,
+      },
+    };
+
+    // Write to file using Node.js fs
+    const fs = require("fs");
+    fs.writeFileSync(METADATA_FILE, JSON.stringify(metadata, null, 2), "utf8");
+
+    // Set permissions to 644 (readable by all, writable by owner)
+    await process_adapter.runWithTimeout(
+      ["chmod", "644", METADATA_FILE],
+      5000,
+      { logger, silent: true }
+    );
+
+    logger.success(`Metadata written to ${METADATA_FILE}`);
+    logger.debug(`  User: ${user}`);
+    logger.debug(`  Runner data dir: ${runnerDataDir}`);
+
+    return {
+      success: true,
+      metadataFile: METADATA_FILE,
+      user: user,
+      runnerDataDir: runnerDataDir,
+    };
+  } catch (err) {
+    logger.error(`Failed to write metadata: ${err.message}`);
+    return {
+      success: false,
+      error: err.message,
+    };
+  }
 }
 
 /**
