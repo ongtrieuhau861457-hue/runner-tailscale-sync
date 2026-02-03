@@ -25,6 +25,33 @@ function executeCommand(host, command, options = {}) {
 }
 
 /**
+ * Execute command với fallback sudo nếu thất bại
+ */
+async function executeCommandWithSudoFallback(host, command, options = {}) {
+  const { logger, sshPath = "ssh", timeout = CONST.SSH_TIMEOUT } = options;
+
+  try {
+    // Thử lệnh thường trước
+    return await executeCommand(host, command, { logger, sshPath, timeout });
+  } catch (err) {
+    // Nếu lỗi và chưa có sudo, thử lại với sudo
+    if (!command.trim().startsWith("sudo")) {
+      if (logger) {
+        logger.debug(`Command failed, retrying with sudo: ${command}`);
+      }
+      try {
+        return await executeCommand(host, `sudo ${command}`, { logger, sshPath, timeout });
+      } catch (sudoErr) {
+        // Throw lỗi sudo nếu cả 2 đều fail
+        throw sudoErr;
+      }
+    }
+    // Nếu đã có sudo rồi mà vẫn lỗi thì throw
+    throw err;
+  }
+}
+
+/**
  * Execute command và capture output
  */
 function executeCommandCapture(host, command, options = {}) {
@@ -75,14 +102,16 @@ async function stopServices(host, services, options = {}) {
   await Promise.all(
     services.map(async (service) => {
       try {
-        await executeCommand(host, `sudo systemctl stop ${service}`, {
+        // Thử systemctl stop với sudo fallback
+        await executeCommandWithSudoFallback(host, `systemctl stop ${service}`, {
           logger,
           sshPath,
         });
         logger.success(`Stopped service: ${service}`);
       } catch (err) {
         try {
-          await executeCommand(host, `pkill -f ${service}`, {
+          // Nếu systemctl fail, thử pkill với sudo fallback
+          await executeCommandWithSudoFallback(host, `pkill -f ${service}`, {
             logger,
             sshPath,
           });
@@ -97,6 +126,7 @@ async function stopServices(host, services, options = {}) {
 
 module.exports = {
   executeCommand,
+  executeCommandWithSudoFallback,
   executeCommandCapture,
   checkConnection,
   stopServices,
