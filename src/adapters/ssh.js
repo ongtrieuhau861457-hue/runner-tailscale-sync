@@ -18,7 +18,7 @@ function executeCommand(host, command, options = {}) {
   const sshArgs = ["-o", "StrictHostKeyChecking=no", "-o", "ConnectTimeout=10", host, command];
 
   if (logger) {
-    logger.command([sshPath, ...sshArgs].join(" "));
+    logger.info([sshPath, ...sshArgs].join(" "));
   }
 
   return process_adapter.runWithTimeout([sshPath, ...sshArgs], timeout, { logger });

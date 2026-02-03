@@ -28,21 +28,7 @@ class Config {
     this.tailscaleClientSecret = process.env.TAILSCALE_CLIENT_SECRET || "";
     this.tailscaleTags = process.env.TAILSCALE_TAGS || CONST.DEFAULT_TAG;
     this.tailscaleEnable = ["1", 1].includes(process.env.TAILSCALE_ENABLE?.trim());
-
-    console.log(
-      JSON.stringify(
-        {
-          tailscaleClientId: this.tailscaleClientId,
-          tailscaleClientId: this.tailscaleClientId,
-          tailscaleClientSecret: this.tailscaleClientSecret,
-          tailscaleTags: this.tailscaleTags,
-          tailscaleEnable: this.tailscaleEnable,
-        },
-        null,
-        2,
-      ),
-    );
-
+    
     // Services to stop on previous runner
     this.servicesToStop = this.parseServicesList(process.env.SERVICES_TO_STOP || "cloudflared,pocketbase,http-server");
 
