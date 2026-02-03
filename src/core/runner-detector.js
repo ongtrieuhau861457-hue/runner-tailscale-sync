@@ -47,35 +47,172 @@ function plan(input) {
 }
 
 /**
- * Execute - tìm runner trước đó
+ * Lấy current working directory của GitHub Actions hoặc Azure Pipelines
+ * Sử dụng absolute paths để tránh vấn đề với sudo/root user
+ */
+function getRunnerWorkDir(targetHost, options) {
+  const { logger, sshPath } = options;
+
+  // Danh sách các path thường gặp, check tuần tự
+  const possiblePaths = [
+    "/home/runner/work", // GitHub Actions (standard)
+    "/home/runner/_work", // GitHub Actions (alternative)
+    "/home/vsts/work", // Azure Pipelines (standard)
+    "/home/vsts/work/1", // Azure Pipelines (common working dir)
+  ];
+
+  for (const path of possiblePaths) {
+    const result = ssh.executeCommandCapture(targetHost, `if [ -d "${path}" ]; then echo "${path}"; fi`, { sshPath, logger });
+
+    if (result && result.trim()) {
+      logger.debug(`Found work dir: ${result.trim()}`);
+      return result.trim();
+    }
+  }
+
+  logger.debug(`No runner work directory found on ${targetHost}`);
+  return null;
+}
+
+/**
+ * Kiểm tra xem peer có .runner-data không
+ */
+function checkRunnerData(targetHost, options) {
+  const { logger, sshPath } = options;
+
+  // Lấy work directory
+  const workDir = getRunnerWorkDir(targetHost, options);
+  if (!workDir) {
+    logger.debug(`No work directory found on ${targetHost}`);
+    return false;
+  }
+
+  // Tìm .runner-data trong work directory
+  const result = ssh.executeCommandCapture(
+    targetHost,
+    `find "${workDir}" -type d -name ".runner-data" -print -quit 2>/dev/null | grep -q ".runner-data" && echo "yes"`,
+    { sshPath, logger },
+  );
+
+  const hasData = result === "yes";
+  if (hasData) {
+    logger.debug(`Found .runner-data in ${workDir} on ${targetHost}`);
+  } else {
+    logger.debug(`No .runner-data found in ${workDir} on ${targetHost}`);
+  }
+
+  return hasData;
+}
+
+/**
+ * Execute - tìm runner trước đó dựa trên tailscale status --json
  */
 async function execute(planResult, input) {
-  const { logger } = input;
+  const { logger, sshPath } = input;
 
   logger.info("Searching for previous runner on Tailscale network...");
 
-  // Get all peers with same tag
-  const peers = tailscale.findPeersWithTag(planResult.tags, logger);
-
-  if (peers.length === 0) {
-    logger.info("No previous runner found");
+  // Lấy tất cả peers từ tailscale status --json
+  const status = tailscale.getStatus(logger);
+  if (!status || !status.Peer) {
+    logger.info("No peers found in Tailscale network");
     return {
       found: false,
       peer: null,
     };
   }
 
-  for (const peer of peers) {
+  const selfIPs = status.Self?.TailscaleIPs || [];
+  logger.debug(`Self IPs: ${selfIPs.join(", ")}`);
+
+  // Filter peers có cùng tag
+  const matchingPeers = [];
+
+  for (const [publicKey, peer] of Object.entries(status.Peer)) {
+    // Bỏ qua chính máy hiện tại
+    if (selfIPs.some((ip) => peer.TailscaleIPs?.includes(ip))) {
+      logger.debug(`Skipping self: ${peer.HostName}`);
+      continue;
+    }
+
+    // Kiểm tra tag
+    const hasSameTag = planResult.tags.some((tag) => {
+      const tagWithPrefix = tag.startsWith("tag:") ? tag : `tag:${tag}`;
+      const tagWithoutPrefix = tag.replace(/^tag:/, "");
+      return peer.Tags?.includes(tagWithPrefix) || peer.Tags?.includes(tagWithoutPrefix);
+    });
+
+    if (!hasSameTag) {
+      logger.debug(`Skipping ${peer.HostName}: no matching tags`);
+      continue;
+    }
+
+    // Chỉ lấy peer đang online
+    if (!peer.Online) {
+      logger.debug(`Skipping ${peer.HostName}: offline`);
+      continue;
+    }
+
+    logger.debug(`Found peer: ${peer.HostName} (${peer.TailscaleIPs?.[0]})`);
+
+    matchingPeers.push({
+      id: peer.ID,
+      publicKey: publicKey,
+      hostname: peer.HostName,
+      dnsName: peer.DNSName,
+      ips: peer.TailscaleIPs || [],
+      tags: peer.Tags || [],
+      online: peer.Online,
+      active: peer.Active,
+      created: peer.Created,
+      lastWrite: peer.LastWrite,
+      lastSeen: peer.LastSeen,
+      os: peer.OS,
+    });
+  }
+
+  if (matchingPeers.length === 0) {
+    logger.info(`No peer(s) with matching tags found`);
+    return {
+      found: false,
+      peer: null,
+    };
+  }
+
+  logger.info(`Found ${matchingPeers.length} peer(s) with matching tags`);
+
+  // Kiểm tra SSH connection cho từng peer
+  for (const peer of matchingPeers) {
     const targetHost = peer.ips?.[0];
     if (!targetHost) {
       peer.accessible = false;
+      logger.debug(`Peer ${peer.hostname}: no IP address`);
       continue;
     }
-    peer.accessible = await Promise.resolve(ssh.checkConnection(targetHost, { logger, sshPath: input.sshPath }));
+
+    logger.debug(`Testing SSH connection to ${targetHost}...`);
+    peer.accessible = await Promise.resolve(ssh.checkConnection(targetHost, { logger, sshPath }));
+
+    if (peer.accessible) {
+      logger.debug(`Peer ${peer.hostname}: SSH accessible`);
+    } else {
+      logger.debug(`Peer ${peer.hostname}: SSH not accessible`);
+    }
   }
 
-  const accessiblePeers = peers.filter((peer) => peer.accessible);
+  const accessiblePeers = matchingPeers.filter((peer) => peer.accessible);
 
+  if (accessiblePeers.length === 0) {
+    logger.info("No accessible peers found");
+    return {
+      found: false,
+      peer: null,
+    };
+  }
+
+  logger.info(`Found ${accessiblePeers.length} accessible peer(s)`);
+
+  // Kiểm tra .runner-data cho từng accessible peer
   for (const peer of accessiblePeers) {
     const targetHost = peer.ips?.[0];
     if (!targetHost) {
@@ -83,24 +220,26 @@ async function execute(planResult, input) {
       continue;
     }
 
-    // Tìm .runner-data trong thư mục work của GitHub Actions
-    // Sử dụng find để tìm kiếm linh hoạt trong ~/work
-    const result = ssh.executeCommandCapture(
-      targetHost,
-      'find ~/work -type d -name ".runner-data" -print -quit 2>/dev/null | grep -q ".runner-data" && echo "yes"',
-      { sshPath: input.sshPath },
-    );
-    peer.hasData = result === "yes";
+    logger.debug(`Checking .runner-data on ${peer.hostname} (${targetHost})...`);
+    peer.hasData = checkRunnerData(targetHost, { logger, sshPath });
   }
 
-  const peer = accessiblePeers
+  // Lọc peers có data và sắp xếp theo thời gian tạo gần nhất
+  const peersWithData = accessiblePeers
     .filter((item) => item.hasData)
     .slice()
     .sort((a, b) => {
-      const ta = a.lastSeen ? Date.parse(a.lastSeen) : 0;
-      const tb = b.lastSeen ? Date.parse(b.lastSeen) : 0;
-      return tb - ta;
-    })[0];
+      // Ưu tiên peer có Created gần nhất
+      const ta = a.created ? Date.parse(a.created) : 0;
+      const tb = b.created ? Date.parse(b.created) : 0;
+      return tb - ta; // Mới nhất trước
+    });
+
+  if (peersWithData.length > 0) {
+    logger.debug(`Found ${peersWithData.length} peer(s) with .runner-data`);
+  }
+
+  const peer = peersWithData[0];
 
   if (!peer) {
     logger.info("No accessible runner with data found");
@@ -113,6 +252,8 @@ async function execute(planResult, input) {
   logger.success(`Found previous runner: ${peer.hostname || peer.id}`);
   logger.info(`  IP: ${peer.ips[0] || "N/A"}`);
   logger.info(`  DNS: ${peer.dnsName || "N/A"}`);
+  logger.info(`  Created: ${peer.created || "N/A"}`);
+  logger.info(`  Active: ${peer.active ? "Yes" : "No"}`);
 
   return {
     found: true,
@@ -168,4 +309,6 @@ module.exports = {
   plan,
   execute,
   report,
+  getRunnerWorkDir,
+  checkRunnerData,
 };
