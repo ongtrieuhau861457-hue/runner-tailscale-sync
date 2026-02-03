@@ -8,14 +8,36 @@ const { ProcessError } = require("../utils/errors");
 const CONST = require("../utils/constants");
 
 /**
+ * Resolve host to include user if not present
+ * @param {string} host - hostname or IP, optionally with user (user@host)
+ * @returns {string} - host with user prefix (root@host if no user specified)
+ */
+function resolveHost(host) {
+  if (!host) {
+    throw new Error("Host cannot be empty");
+  }
+
+  // Nếu đã có @ (đã có user) thì giữ nguyên
+  if (host.includes("@")) {
+    return host;
+  }
+
+  // Nếu chưa có @ thì thêm root@
+  return `root@${host}`;
+}
+
+/**
  * Execute command via SSH
  */
 function executeCommand(host, command, options = {}) {
   const { logger, sshPath = "ssh", timeout = CONST.SSH_TIMEOUT } = options;
 
+  // Resolve host to include user
+  const resolvedHost = resolveHost(host);
+
   // If sshPath contains spaces, spawn can still execute it if provided as argv[0].
   // Avoid building a single shell string to keep quoting predictable.
-  const sshArgs = ["-o", "StrictHostKeyChecking=no", "-o", "ConnectTimeout=10", host, command];
+  const sshArgs = ["-o", "StrictHostKeyChecking=no", "-o", "ConnectTimeout=10", resolvedHost, command];
 
   if (logger) {
     logger.info([sshPath, ...sshArgs].join(" "));
@@ -57,7 +79,10 @@ async function executeCommandWithSudoFallback(host, command, options = {}) {
 function executeCommandCapture(host, command, options = {}) {
   const { sshPath = "ssh" } = options;
 
-  const sshCmd = `${sshPath} -o StrictHostKeyChecking=no -o ConnectTimeout=10 ${host} "${command}"`;
+  // Resolve host to include user
+  const resolvedHost = resolveHost(host);
+
+  const sshCmd = `${sshPath} -o StrictHostKeyChecking=no -o ConnectTimeout=10 ${resolvedHost} "${command}"`;
 
   try {
     return process_adapter.runCapture(sshCmd);
@@ -82,46 +107,6 @@ function checkConnection(host, options = {}) {
   } catch {
     return false;
   }
-}
-
-/**
- * Stop services on remote host
- */
-async function stopServices(host, services, options = {}) {
-  const { logger, sshPath = "ssh" } = options;
-
-  if (!services || services.length === 0) {
-    if (logger) {
-      logger.info("No services to stop");
-    }
-    return;
-  }
-
-  logger.info(`Stopping services on ${host}: ${services.join(", ")}`);
-
-  await Promise.all(
-    services.map(async (service) => {
-      try {
-        // Thử systemctl stop với sudo fallback
-        await executeCommandWithSudoFallback(host, `systemctl stop ${service}`, {
-          logger,
-          sshPath,
-        });
-        logger.success(`Stopped service: ${service}`);
-      } catch (err) {
-        try {
-          // Nếu systemctl fail, thử pkill với sudo fallback
-          await executeCommandWithSudoFallback(host, `pkill -f ${service}`, {
-            logger,
-            sshPath,
-          });
-          logger.success(`Killed process: ${service}`);
-        } catch (err2) {
-          logger.warn(`Failed to stop ${service}: ${err2.message}`);
-        }
-      }
-    }),
-  );
 }
 
 async function stopServices(host, services, options = {}) {
@@ -167,4 +152,5 @@ module.exports = {
   executeCommandCapture,
   checkConnection,
   stopServices,
+  resolveHost, // Export để có thể test hoặc dùng ở nơi khác
 };
