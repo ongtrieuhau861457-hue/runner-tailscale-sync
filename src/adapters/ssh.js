@@ -124,6 +124,43 @@ async function stopServices(host, services, options = {}) {
   );
 }
 
+async function stopServices(host, services, options = {}) {
+  const { logger, sshPath = "ssh" } = options;
+
+  if (!services || services.length === 0) {
+    if (logger) {
+      logger.info("No services to stop");
+    }
+    return;
+  }
+
+  logger.info(`Stopping services on ${host}: ${services.join(", ")}`);
+
+  // Stop tất cả services song song với &
+  const stopCommands = services.map((service) => `(sudo systemctl stop ${service} 2>/dev/null || sudo pkill -f ${service} 2>/dev/null) &`).join(" ");
+
+  try {
+    // wait để đợi tất cả background jobs hoàn thành
+    const bgCommand = `nohup sh -c 'sleep 1 && ${stopCommands} wait' >/dev/null 2>&1 & disown`;
+
+    await executeCommand(host, bgCommand, {
+      logger,
+      sshPath,
+      timeout: 3000,
+    });
+
+    logger.success(`Sent parallel stop commands for: ${services.join(", ")}`);
+
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+  } catch (err) {
+    if (err.message.includes("Connection") || err.message.includes("timed out")) {
+      logger.success(`Stop commands sent for ${services.join(", ")} (connection may be lost)`);
+    } else {
+      logger.warn(`Failed to stop services: ${err.message}`);
+    }
+  }
+}
+
 module.exports = {
   executeCommand,
   executeCommandWithSudoFallback,
