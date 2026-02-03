@@ -100,10 +100,11 @@ function checkConnection(host, options = {}) {
   if (logger) {
     logger.debug(`Testing SSH connection to ${host}...`);
   }
+  const strOK = "OKKK";
 
   try {
-    const result = executeCommandCapture(host, "echo OK", { sshPath });
-    return result === "OK";
+    const result = executeCommandCapture(host, "echo " + strOK, { sshPath });
+    return (result + "").includes(strOK);
   } catch {
     return false;
   }
