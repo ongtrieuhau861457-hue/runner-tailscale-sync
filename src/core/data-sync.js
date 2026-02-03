@@ -10,42 +10,37 @@ const CONST = require("../utils/constants");
 
 /**
  * Check if remote directory exists
+ *
+ * NOTE: Tạm thời không dùng vì có issue với output capture trong một số môi trường.
+ * Thay vào đó, để rsync tự handle với --ignore-missing-args flag.
+ * Keep function này để reference sau.
  */
+/*
 async function checkRemoteDir(remoteHost, remoteDir, sshPath, logger) {
   try {
-    const checkCmd = [
-      sshPath,
-      "-o",
-      "StrictHostKeyChecking=no",
-      "-o",
-      "LogLevel=ERROR",
-      "-o",
-      "ConnectTimeout=10",
-      remoteHost,
-      // Thêm marker rõ ràng để tránh nhầm lẫn với output khác
-      `test -d ${remoteDir} && echo "MARKER:exists" || echo "MARKER:not_found"`,
-    ];
-
-    const result = await process_adapter.runWithTimeout(
-      checkCmd,
-      10000, // 10s timeout
-      { logger, silent: true },
-    );
-
-    // Check cả stdout.includes thay vì === để tránh ký tự ẩn
-    const output = (result.stdout || "").trim();
-    const exists = output.includes("MARKER:exists");
-
-    if (!exists) {
-      logger.debug(`Remote dir check output: "${output}"`);
-    }
-
+    // Giải pháp 1: Dùng executeCommandCapture từ ssh adapter (nếu có)
+    // Nếu không có ssh adapter, dùng cách thủ công
+    const ssh = require("../adapters/ssh");
+    
+    const command = `test -d "${remoteDir}" && echo "MARKER:exists" || echo "MARKER:not_found"`;
+    const output = ssh.executeCommandCapture(remoteHost, command, { 
+      sshPath, 
+      logger,
+      silent: true 
+    });
+    
+    logger.debug(`checkRemoteDir ssh output: "${output}"`);
+    
+    const exists = output && output.includes("MARKER:exists");
+    logger.debug(`checkRemoteDir result: exists=${exists}`);
+    
     return exists;
   } catch (err) {
     logger.warn(`Could not check remote directory: ${err.message}`);
     return false;
   }
 }
+*/
 
 /**
  * Parse input
@@ -121,18 +116,9 @@ async function execute(planResult, input) {
   const { logger } = input;
   logger.info(`Syncing data from ${planResult.source}...`);
 
-  // Check if remote directory exists first
-  const remoteExists = await checkRemoteDir(planResult.remoteHost, planResult.remoteDataDir, planResult.sshPath, logger);
-
-  if (!remoteExists) {
-    logger.warn(`Remote directory ${planResult.remoteDataDir} does not exist on ${planResult.remoteHost}`);
-    logger.info("Skipping data sync - no data to pull");
-    return {
-      success: true,
-      size: 0,
-      skipped: true,
-    };
-  }
+  // APPROACH V2: Skip precheck, rsync sẽ tự báo lỗi nếu dir không tồn tại
+  // Lý do: SSH check có vấn đề với output capture trong một số môi trường
+  // Rsync đủ thông minh để handle missing source dir
 
   // Ensure local directory exists
   fs_adapter.ensureDir(planResult.destination);
@@ -145,6 +131,7 @@ async function execute(planResult, input) {
     "--delete",
     "--partial",
     "--progress",
+    "--ignore-missing-args", // 👈 Quan trọng: không fail nếu source không tồn tại
     "-e",
     `${planResult.sshPath} -o StrictHostKeyChecking=no -o LogLevel=ERROR`,
     planResult.source,
@@ -157,6 +144,16 @@ async function execute(planResult, input) {
 
     // Get synced size
     const size = fs_adapter.getDirSize(planResult.destination);
+
+    if (size === 0) {
+      logger.info("No data was synced (empty or missing source directory)");
+      return {
+        success: true,
+        size: 0,
+        skipped: true,
+      };
+    }
+
     logger.info(`Synced size: ${fs_adapter.formatBytes(size)}`);
 
     return {
@@ -164,6 +161,17 @@ async function execute(planResult, input) {
       size,
     };
   } catch (err) {
+    // Check nếu lỗi do source không tồn tại
+    if (err.message.includes("No such file") || err.message.includes("does not exist")) {
+      logger.warn(`Remote directory does not exist or is empty`);
+      logger.info("Skipping data sync - no data to pull");
+      return {
+        success: true,
+        size: 0,
+        skipped: true,
+      };
+    }
+
     // If rsync not available, try scp as fallback
     logger.warn("Rsync failed, trying scp as fallback...");
     try {
@@ -244,5 +252,5 @@ module.exports = {
   plan,
   execute,
   report,
-  checkRemoteDir,
+  // checkRemoteDir, // Disabled - see comment in function
 };
