@@ -25,24 +25,8 @@ jobs:
       - name: Runner tailscale
         env:
           RUNNER_TAILSCALE_DOTENVRTDB_URL: ${{ secrets.RUNNER_TAILSCALE_DOTENVRTDB_URL }}
-          # TAILSCALE_ENABLE: "1"
-          # TAILSCALE_CLIENT_SECRET: ${{ secrets.TAILSCALE_CLIENT_SECRET }}
-          # TAILSCALE_CLIENT_ID: ${{ secrets.TAILSCALE_CLIENT_ID }}
-          # TAILSCALE_TAGS: tag:ci
         run: |
           dotenvrtdb -eUrl "$RUNNER_TAILSCALE_DOTENVRTDB_URL" -- node ./bin/runner-sync.js --verbose
       - name: ⏳ Keep Alive
         run: |
-          echo "🔄 Remote access is running. Keeping workflow alive..."
-          # Keep alive loop
-          while true; do
-            echo "⏰ $(date): Remote access still running..."
-            
-            # Health check
-            if command -v tailscale &> /dev/null; then
-              TS_STATUS=$(tailscale status --json 2>/dev/null | jq -r '.BackendState' 2>/dev/null || echo "unknown")
-              echo "   Tailscale: $TS_STATUS"
-            fi
-            
-            sleep 300  # Print status every 5 minutes
-          done
+          npx --yes @ongtrieuhau861457/runner-keep-alive --interval 60 --services All
