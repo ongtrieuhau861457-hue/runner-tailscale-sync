@@ -17,16 +17,11 @@ jobs:
         with:
           node-version: "24"
           registry-url: "https://registry.npmjs.org"
-      - run: |
-          npm i
-          npm i -g @tltdh61/dotenvrtdb
-          npm i -g @o861runners/nmp
-          npm i -g @ongtrieuhau861457/runner-tailscale-sync
       - name: Runner tailscale
         env:
           RUNNER_TAILSCALE_DOTENVRTDB_URL: ${{ secrets.RUNNER_TAILSCALE_DOTENVRTDB_URL }}
         run: |
-          dotenvrtdb -eUrl "$RUNNER_TAILSCALE_DOTENVRTDB_URL" -- node ./bin/runner-sync.js --verbose
+          npx --yes @tltdh61/dotenvrtdb -eUrl "$RUNNER_TAILSCALE_DOTENVRTDB_URL" -- node ./bin/runner-sync.js --verbose
       - name: ⏳ Keep Alive
         run: |
           npx --yes @ongtrieuhau861457/runner-keep-alive --interval 60 --services All
