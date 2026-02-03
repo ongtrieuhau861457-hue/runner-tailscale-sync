@@ -175,7 +175,7 @@ async function setupDirectories(config, logger) {
 
   // Gọi hàm ghi metadata.json
   const metadataResult = await setupMetaJson(config, logger);
-  
+
   if (!metadataResult.success) {
     logger.warn("Failed to write metadata file");
   }
@@ -193,7 +193,7 @@ async function setupDirectories(config, logger) {
  */
 async function setupMetaJson(config, logger) {
   const METADATA_FILE = "/var/tmp/runner-tailscale-sync-metadata.json";
-  
+
   logger.info("Writing runner metadata...");
 
   try {
@@ -201,12 +201,8 @@ async function setupMetaJson(config, logger) {
     const path = require("path");
 
     // Get current user
-    const userResult = await process_adapter.runWithTimeout(
-      ["whoami"],
-      5000,
-      { logger, silent: true }
-    );
-    const user = userResult.stdout?.trim() || "unknown";
+    const userResult = await process_adapter.runWithTimeout(["whoami"], 5000, { logger, silent: true });
+    const user = userResult.stdout?.trim() || process.env.USER || "unknown";
 
     // Get current working directory
     const cwd = process.cwd();
@@ -236,14 +232,14 @@ async function setupMetaJson(config, logger) {
         USER: process.env.USER,
         PATH: process.env.PATH,
         SHELL: process.env.SHELL,
-        
+
         // Azure Pipelines specific
         AGENT_NAME: process.env.AGENT_NAME,
         AGENT_ID: process.env.AGENT_ID,
         AGENT_WORKFOLDER: process.env.AGENT_WORKFOLDER,
         BUILD_BUILDID: process.env.BUILD_BUILDID,
         SYSTEM_TEAMPROJECT: process.env.SYSTEM_TEAMPROJECT,
-        
+
         // GitHub Actions specific
         GITHUB_ACTIONS: process.env.GITHUB_ACTIONS,
         GITHUB_WORKFLOW: process.env.GITHUB_WORKFLOW,
@@ -251,7 +247,7 @@ async function setupMetaJson(config, logger) {
         GITHUB_REPOSITORY: process.env.GITHUB_REPOSITORY,
         RUNNER_NAME: process.env.RUNNER_NAME,
         RUNNER_WORKSPACE: process.env.RUNNER_WORKSPACE,
-        
+
         // Tailscale specific (nếu có)
         TAILSCALE_IP: process.env.TAILSCALE_IP,
         TAILSCALE_HOSTNAME: process.env.TAILSCALE_HOSTNAME,
@@ -263,11 +259,7 @@ async function setupMetaJson(config, logger) {
     fs.writeFileSync(METADATA_FILE, JSON.stringify(metadata, null, 2), "utf8");
 
     // Set permissions to 644 (readable by all, writable by owner)
-    await process_adapter.runWithTimeout(
-      ["chmod", "644", METADATA_FILE],
-      5000,
-      { logger, silent: true }
-    );
+    await process_adapter.runWithTimeout(["chmod", "644", METADATA_FILE], 5000, { logger, silent: true });
 
     logger.success(`Metadata written to ${METADATA_FILE}`);
     logger.debug(`  User: ${user}`);

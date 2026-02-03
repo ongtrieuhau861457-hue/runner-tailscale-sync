@@ -96,7 +96,15 @@ function getRemoteMetadata(targetHost, options) {
     }
 
     const metadata = JSON.parse(result);
-    logger.debug(`Metadata found: user=${metadata.runner?.user || metadata.env?.USER}, dataDir=${metadata.runner?.runnerDataDir}`);
+
+    // Ưu tiên env.USER, fallback runner.user
+    const metaUser = metadata.runner?.user;
+    const envUser = metadata.env?.USER;
+    const actualUser = metaUser && metaUser !== "unknown" ? metaUser : envUser || "unknown";
+
+    logger.debug(
+      `Metadata found: user=${actualUser} (from ${actualUser === envUser ? "env.USER" : "runner.user"}), dataDir=${metadata.runner?.runnerDataDir}`,
+    );
     return metadata;
   } catch (err) {
     logger.debug(`Failed to read metadata from ${targetHost}: ${err.message}`);
@@ -114,7 +122,11 @@ function checkRunnerData(targetHost, options) {
   const metadata = getRemoteMetadata(targetHost, options);
   if (metadata && metadata.runner?.runnerDataDir) {
     const dataDir = metadata.runner.runnerDataDir;
-    const user = metadata.env?.USER || "runner";
+
+    // Ưu tiên env.USER, fallback runner.user, cuối cùng mới dùng "runner"
+    const metaUser = metadata.runner?.user;
+    const envUser = metadata.env?.USER;
+    const user = metaUser && metaUser !== "unknown" ? metaUser : envUser || "runner";
 
     logger.debug(`Using metadata: ${user}@${targetHost}:${dataDir}`);
 

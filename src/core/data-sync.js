@@ -22,7 +22,8 @@ async function checkRemoteDir(remoteHost, remoteDir, sshPath, logger) {
       "-o",
       "ConnectTimeout=10",
       remoteHost,
-      `test -d ${remoteDir} && echo "exists" || echo "not_found"`,
+      // Thêm marker rõ ràng để tránh nhầm lẫn với output khác
+      `test -d ${remoteDir} && echo "MARKER:exists" || echo "MARKER:not_found"`,
     ];
 
     const result = await process_adapter.runWithTimeout(
@@ -31,7 +32,15 @@ async function checkRemoteDir(remoteHost, remoteDir, sshPath, logger) {
       { logger, silent: true },
     );
 
-    return result.stdout?.trim() === "exists";
+    // Check cả stdout.includes thay vì === để tránh ký tự ẩn
+    const output = (result.stdout || "").trim();
+    const exists = output.includes("MARKER:exists");
+
+    if (!exists) {
+      logger.debug(`Remote dir check output: "${output}"`);
+    }
+
+    return exists;
   } catch (err) {
     logger.warn(`Could not check remote directory: ${err.message}`);
     return false;
@@ -49,8 +58,13 @@ function parseInput(config, previousRunner, logger) {
   let remoteDataDir = config.runnerDataDir;
 
   if (previousRunner?.metadata) {
-    remoteUser = previousRunner.metadata.env?.USER || "runner";
+    // Ưu tiên env.USER, fallback sang runner.user, cuối cùng mới dùng "root"
+    const metaUser = previousRunner.metadata.runner?.user;
+    const envUser = previousRunner.metadata.env?.USER;
+
+    remoteUser = metaUser && metaUser !== "unknown" ? metaUser : envUser || "root";
     remoteDataDir = previousRunner.metadata.runner?.runnerDataDir || config.runnerDataDir;
+
     logger.debug(`Using metadata: user=${remoteUser}, dataDir=${remoteDataDir}`);
   }
 
