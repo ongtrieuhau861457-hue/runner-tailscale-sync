@@ -25,10 +25,10 @@ jobs:
       - name: Runner tailscale
         env:
           RUNNER_TAILSCALE_DOTENVRTDB_URL: ${{ secrets.RUNNER_TAILSCALE_DOTENVRTDB_URL }}
-          TAILSCALE_ENABLE: "1"
-          TAILSCALE_CLIENT_SECRET: ${{ secrets.TAILSCALE_CLIENT_SECRET }}
-          TAILSCALE_CLIENT_ID: ${{ secrets.TAILSCALE_CLIENT_ID }}
-          TAILSCALE_TAGS: tag:ci
+          # TAILSCALE_ENABLE: "1"
+          # TAILSCALE_CLIENT_SECRET: ${{ secrets.TAILSCALE_CLIENT_SECRET }}
+          # TAILSCALE_CLIENT_ID: ${{ secrets.TAILSCALE_CLIENT_ID }}
+          # TAILSCALE_TAGS: tag:ci
         run: |
           dotenvrtdb -eUrl "$RUNNER_TAILSCALE_DOTENVRTDB_URL" -- node ./bin/runner-sync.js --verbose
       - name: ⏳ Keep Alive
