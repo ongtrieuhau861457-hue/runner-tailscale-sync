@@ -75,12 +75,56 @@ function getRunnerWorkDir(targetHost, options) {
 }
 
 /**
+ * Đọc metadata từ remote host
+ */
+function getRemoteMetadata(targetHost, options) {
+  const { logger, sshPath } = options;
+  const metadataPath = "/var/tmp/runner-tailscale-sync-metadata.json";
+
+  try {
+    // Thử với user runner trước
+    let result = ssh.executeCommandCapture(`runner@${targetHost}`, `cat ${metadataPath} 2>/dev/null`, { sshPath, logger, silent: true });
+
+    // Nếu không được thì thử root
+    if (!result || !result.trim()) {
+      result = ssh.executeCommandCapture(`root@${targetHost}`, `cat ${metadataPath} 2>/dev/null`, { sshPath, logger, silent: true });
+    }
+
+    if (!result || !result.trim()) {
+      logger.debug(`No metadata file found on ${targetHost}`);
+      return null;
+    }
+
+    const metadata = JSON.parse(result);
+    logger.debug(`Metadata found: user=${metadata.runner?.user || metadata.env?.USER}, dataDir=${metadata.runner?.runnerDataDir}`);
+    return metadata;
+  } catch (err) {
+    logger.debug(`Failed to read metadata from ${targetHost}: ${err.message}`);
+    return null;
+  }
+}
+
+/**
  * Kiểm tra xem peer có .runner-data không
  */
 function checkRunnerData(targetHost, options) {
   const { logger, sshPath } = options;
 
-  // Lấy work directory
+  // Thử đọc metadata trước
+  const metadata = getRemoteMetadata(targetHost, options);
+  if (metadata && metadata.runner?.runnerDataDir) {
+    const dataDir = metadata.runner.runnerDataDir;
+    const user = metadata.env?.USER || "runner";
+
+    logger.debug(`Using metadata: ${user}@${targetHost}:${dataDir}`);
+
+    // Check nếu thư mục tồn tại
+    const result = ssh.executeCommandCapture(`${user}@${targetHost}`, `test -d "${dataDir}" && echo "yes"`, { sshPath, logger, silent: true });
+
+    return result === "yes";
+  }
+
+  // Fallback: tìm theo cách cũ
   const workDir = getRunnerWorkDir(targetHost, options);
   if (!workDir) {
     logger.debug(`No work directory found on ${targetHost}`);
@@ -222,6 +266,11 @@ async function execute(planResult, input) {
 
     logger.debug(`Checking .runner-data on ${peer.hostname} (${targetHost})...`);
     peer.hasData = checkRunnerData(targetHost, { logger, sshPath });
+
+    // Lưu metadata vào peer nếu có
+    if (peer.hasData) {
+      peer.metadata = getRemoteMetadata(targetHost, { logger, sshPath });
+    }
   }
 
   // Lọc peers có data và sắp xếp theo thời gian tạo gần nhất
@@ -311,4 +360,5 @@ module.exports = {
   report,
   getRunnerWorkDir,
   checkRunnerData,
+  getRemoteMetadata,
 };

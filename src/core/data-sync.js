@@ -9,25 +9,6 @@ const { SyncError, ValidationError } = require("../utils/errors");
 const CONST = require("../utils/constants");
 
 /**
- * Resolve host to include user if not present
- * @param {string} host - hostname or IP, optionally with user (user@host)
- * @returns {string} - host with user prefix (root@host if no user specified)
- */
-function resolveHost(host) {
-  if (!host) {
-    return host;
-  }
-
-  // Nếu đã có @ (đã có user) thì giữ nguyên
-  if (host.includes("@")) {
-    return host;
-  }
-
-  // Nếu chưa có @ thì thêm root@
-  return `root@${host}`;
-}
-
-/**
  * Check if remote directory exists
  */
 async function checkRemoteDir(remoteHost, remoteDir, sshPath, logger) {
@@ -61,14 +42,26 @@ async function checkRemoteDir(remoteHost, remoteDir, sshPath, logger) {
  * Parse input
  */
 function parseInput(config, previousRunner, logger) {
-  const remoteHostRaw = previousRunner?.dnsName || previousRunner?.ips?.[0];
-  const remoteHost = resolveHost(remoteHostRaw);
+  const remoteHostRaw = previousRunner?.ips?.[0];
+
+  // Ưu tiên dùng metadata nếu có
+  let remoteUser = "root";
+  let remoteDataDir = config.runnerDataDir;
+
+  if (previousRunner?.metadata) {
+    remoteUser = previousRunner.metadata.env?.USER || "runner";
+    remoteDataDir = previousRunner.metadata.runner?.runnerDataDir || config.runnerDataDir;
+    logger.debug(`Using metadata: user=${remoteUser}, dataDir=${remoteDataDir}`);
+  }
+
+  const remoteHost = remoteHostRaw ? `${remoteUser}@${remoteHostRaw}` : null;
 
   return {
     localDataDir: config.runnerDataDir,
     remoteHost: remoteHost,
     remoteHostRaw: remoteHostRaw, // Lưu lại để check isLocalNetwork
-    remoteDataDir: config.runnerDataDir,
+    remoteDataDir: remoteDataDir,
+    remoteUser: remoteUser,
     rsyncPath: config.rsyncPath,
     sshPath: config.sshPath,
     logger,
@@ -237,6 +230,5 @@ module.exports = {
   plan,
   execute,
   report,
-  resolveHost,
   checkRemoteDir,
 };

@@ -9,6 +9,7 @@ permissions:
 jobs:
   tailscale-runner:
     runs-on: ubuntu-latest
+    timeout-minutes: 10 # Set the maximum runtime for this job to 20 minutes
     steps:
       - uses: actions/checkout@v4
         with:
