@@ -96,14 +96,16 @@ function executeCommandCapture(host, command, options = {}) {
  */
 function checkConnection(host, options = {}) {
   const { logger, sshPath = "ssh" } = options;
+  // Resolve host to include user
+  const resolvedHost = resolveHost(host);
 
   if (logger) {
-    logger.debug(`Testing SSH connection to ${host}...`);
+    logger.debug(`Testing SSH connection to ${resolvedHost}...`);
   }
   const strOK = "OKKK";
-
   try {
-    const result = executeCommandCapture(host, "echo " + strOK, { sshPath });
+    const result = executeCommandCapture(resolvedHost, "echo " + strOK, { sshPath });
+    logger.debug(`Capture checkConnection: ${result}`);
     return (result + "").includes(strOK);
   } catch {
     return false;
@@ -120,7 +122,10 @@ async function stopServices(host, services, options = {}) {
     return;
   }
 
-  logger.info(`Stopping services on ${host}: ${services.join(", ")}`);
+  // Resolve host to include user
+  const resolvedHost = resolveHost(host);
+
+  logger.info(`Stopping services on ${resolvedHost}: ${services.join(", ")}`);
 
   // Stop tất cả services song song với &
   const stopCommands = services.map((service) => `(sudo systemctl stop ${service} 2>/dev/null || sudo pkill -f ${service} 2>/dev/null) &`).join(" ");
@@ -129,7 +134,7 @@ async function stopServices(host, services, options = {}) {
     // wait để đợi tất cả background jobs hoàn thành
     const bgCommand = `nohup sh -c 'sleep 1 && ${stopCommands} wait' >/dev/null 2>&1 & disown`;
 
-    await executeCommand(host, bgCommand, {
+    await executeCommand(resolvedHost, bgCommand, {
       logger,
       sshPath,
       timeout: 3000,
