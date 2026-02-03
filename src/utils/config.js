@@ -27,12 +27,10 @@ class Config {
     this.tailscaleClientId = process.env.TAILSCALE_CLIENT_ID || "";
     this.tailscaleClientSecret = process.env.TAILSCALE_CLIENT_SECRET || "";
     this.tailscaleTags = process.env.TAILSCALE_TAGS || CONST.DEFAULT_TAG;
-    this.tailscaleEnable = String(process.env.TAILSCALE_ENABLE || "").trim() === "1";
+    this.tailscaleEnable = ["1", 1].includes(process.env.TAILSCALE_ENABLE?.trim());
 
     // Services to stop on previous runner
-    this.servicesToStop = this.parseServicesList(
-      process.env.SERVICES_TO_STOP || "cloudflared,pocketbase,http-server"
-    );
+    this.servicesToStop = this.parseServicesList(process.env.SERVICES_TO_STOP || "cloudflared,pocketbase,http-server");
 
     // Platform detection
     this.isWindows = os.platform() === "win32";
@@ -61,7 +59,7 @@ class Config {
 
     try {
       const content = fs.readFileSync(envPath, "utf8");
-      content.split("\n").forEach(line => {
+      content.split("\n").forEach((line) => {
         const trimmed = line.trim();
         if (!trimmed || trimmed.startsWith("#")) return;
 
@@ -71,8 +69,7 @@ class Config {
           let value = match[2].trim();
 
           // Remove quotes
-          if ((value.startsWith('"') && value.endsWith('"')) ||
-              (value.startsWith("'") && value.endsWith("'"))) {
+          if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
             value = value.slice(1, -1);
           }
 
@@ -91,7 +88,10 @@ class Config {
    * Parse comma-separated services list
    */
   parseServicesList(str) {
-    return str.split(",").map(s => s.trim()).filter(Boolean);
+    return str
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
   }
 
   /**
@@ -116,13 +116,7 @@ class Config {
    * Get all directories that need to be created
    */
   getDirectoriesToEnsure() {
-    return [
-      this.runnerDataDir,
-      this.logsDir,
-      this.pidDir,
-      this.dataServicesDir,
-      this.tmpDir,
-    ];
+    return [this.runnerDataDir, this.logsDir, this.pidDir, this.dataServicesDir, this.tmpDir];
   }
 }
 
