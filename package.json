@@ -4,7 +4,8 @@
   "description": "Đồng bộ runner-data giữa các runner trên GitHub Actions, Azure Pipeline qua Tailscale network",
   "main": "src/index.js",
   "bin": {
-    "runner-sync": "./bin/runner-sync.js"
+    "runner-sync": "./bin/runner-sync.js",
+    "runner-tailscale-sync": "./bin/runner-sync.js"
   },
   "engines": {
     "node": ">=20.0.0"

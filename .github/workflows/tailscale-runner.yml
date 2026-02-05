@@ -22,8 +22,8 @@ jobs:
         env:
           RUNNER_TAILSCALE_DOTENVRTDB_URL: ${{ secrets.RUNNER_TAILSCALE_DOTENVRTDB_URL }}
         run: |
-          npx --yes @tltdh61/dotenvrtdb -eUrl "$RUNNER_TAILSCALE_DOTENVRTDB_URL" -- npx --yes @hugginroonin/runner-add-ssh
-          npx --yes @tltdh61/dotenvrtdb -eUrl "$RUNNER_TAILSCALE_DOTENVRTDB_URL" -- node ./bin/runner-sync.js --verbose
+          npx --yes @tltdh61/dotenvrtdb --eUrl "$RUNNER_TAILSCALE_DOTENVRTDB_URL" -- npx --yes @hugginroonin/runner-add-ssh 
+          npx --yes @tltdh61/dotenvrtdb --eUrl "$RUNNER_TAILSCALE_DOTENVRTDB_URL" -- node ./bin/runner-sync.js --verbose
       - name: ⏳ Keep Alive
         run: |
           npx --yes @ongtrieuhau861457/runner-keep-alive --interval 60 --services All
